@@ -27,10 +27,13 @@ public class Lexer {
         if (error != null) {
             return Optional.of(error);
         }
+
+        // We've reached EOF after skipping whitespaces
         if (this.pos >= this.source.length()) {
             return Optional.empty();
         }
-        Token t = switch (peek()) {
+
+        return Optional.of(switch (peek()) {
             case '(' -> separator(SeparatorType.PAREN_OPEN);
             case ')' -> separator(SeparatorType.PAREN_CLOSE);
             case '{' -> separator(SeparatorType.BRACE_OPEN);
@@ -51,11 +54,13 @@ public class Lexer {
                 }
                 yield new ErrorToken(String.valueOf(peek()), buildSpan(1));
             }
-        };
-
-        return Optional.of(t);
+        });
     }
 
+    /// Skips whitespaces, newlines, and comments. Also has logic to correctly skip
+    /// (possibly nested) multiline comments.
+    ///
+    /// @return An ErrorToken if there was an unterminated multiline comment
     private @Nullable ErrorToken skipWhitespace() {
         enum CommentType {
             SINGLE_LINE,
@@ -129,52 +134,68 @@ public class Lexer {
     }
 
     private Token lexIdentifierOrKeyword() {
-        int off = 1;
-        while (hasMore(off) && isIdentifierChar(peek(off))) {
-            off++;
+        // Walk past the identifier after which offset contains the length of it.
+        int offset = 1;
+        while (hasMore(offset) && isIdentifierChar(peek(offset))) {
+            offset++;
         }
-        String id = this.source.substring(this.pos, this.pos + off);
-        // This is a naive solution. Using a better data structure (hashmap, trie) likely performs better.
-        for (KeywordType value : KeywordType.values()) {
-            if (value.keyword().equals(id)) {
-                return new Keyword(value, buildSpan(off));
-            }
+
+        // Extract the identifier from the source string
+        String identifier = this.source.substring(this.pos, this.pos + offset);
+
+        // Check if the identifier is a keyword
+        if (KeywordType.keywords().containsKey(identifier)) {
+            KeywordType type = KeywordType.keywords().get(identifier);
+            return new Keyword(type, buildSpan(offset));
         }
-        return new Identifier(id, buildSpan(off));
+
+        // Otherwise, return it as an identifier
+        return new Identifier(identifier, buildSpan(offset));
     }
 
     private Token lexNumber() {
         if (isHexPrefix()) {
-            int off = 2;
-            while (hasMore(off) && isHex(peek(off))) {
-                off++;
+            int offset = 2;
+            while (hasMore(offset) && isHex(peek(offset))) {
+                offset++;
             }
-            if (off == 2) {
+            if (offset == 2) {
                 // 0x without any further hex digits
-                return new ErrorToken(this.source.substring(this.pos, this.pos + off), buildSpan(2));
+                return new ErrorToken(this.source.substring(this.pos, this.pos + offset), buildSpan(2));
             }
-            return new NumberLiteral(this.source.substring(this.pos, this.pos + off), 16, buildSpan(off));
+            return new NumberLiteral(this.source.substring(this.pos, this.pos + offset), 16, buildSpan(offset));
         }
-        int off = 1;
-        while (hasMore(off) && isNumeric(peek(off))) {
-            off++;
+
+        // We set offset to `1` because this function is only called if the char at `0`
+        // is a number.
+        //
+        // We then walk past the number literal after which `offset` contains the length
+        // of the literal.
+        int offset = 1;
+        while (hasMore(offset) && isNumeric(peek(offset))) {
+            offset++;
         }
-        if (peek() == '0' && off > 1) {
-            // leading zero is not allowed
-            return new ErrorToken(this.source.substring(this.pos, this.pos + off), buildSpan(off));
+
+        // Check for leading zero and reject
+        if (peek() == '0' && offset > 1) {
+            return new ErrorToken(this.source.substring(this.pos, this.pos + offset), buildSpan(offset));
         }
-        return new NumberLiteral(this.source.substring(this.pos, this.pos + off), 10, buildSpan(off));
+
+        return new NumberLiteral(this.source.substring(this.pos, this.pos + offset), 10, buildSpan(offset));
     }
 
     private boolean isHexPrefix() {
         return peek() == '0' && hasMore(1) && (peek(1) == 'x' || peek(1) == 'X');
     }
 
+    /**
+     * No emoji identifiers 😢
+     */
     private boolean isIdentifierChar(char c) {
         return c == '_'
-            || c >= 'a' && c <= 'z'
-            || c >= 'A' && c <= 'Z'
-            || c >= '0' && c <= '9';
+                || c >= 'a' && c <= 'z'
+                || c >= 'A' && c <= 'Z'
+                || c >= '0' && c <= '9';
     }
 
     private boolean isNumeric(char c) {
@@ -185,6 +206,9 @@ public class Lexer {
         return isNumeric(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
     }
 
+    /**
+     * Check if the operator is followed by an equals sign (`a * 2` vs `a *= 2`)
+     */
     private Token singleOrAssign(OperatorType single, OperatorType assign) {
         if (hasMore(1) && peek(1) == '=') {
             return new Operator(assign, buildSpan(2));

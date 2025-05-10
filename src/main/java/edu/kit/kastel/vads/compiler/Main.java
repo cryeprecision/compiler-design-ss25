@@ -25,9 +25,11 @@ public class Main {
             System.err.println("Invalid arguments: Expected one input file and one output file");
             System.exit(3);
         }
+
         Path input = Path.of(args[0]);
         Path output = Path.of(args[1]);
         ProgramTree program = lexAndParse(input);
+
         try {
             new SemanticAnalysis(program).analyze();
         } catch (SemanticException e) {
@@ -35,13 +37,15 @@ public class Main {
             System.exit(7);
             return;
         }
+
         List<IrGraph> graphs = new ArrayList<>();
         for (FunctionTree function : program.topLevelTrees()) {
             SsaTranslation translation = new SsaTranslation(function, new LocalValueNumbering());
             graphs.add(translation.translate());
         }
 
-        // TODO: generate assembly and invoke gcc instead of generating abstract assembly
+        // TODO: generate assembly and invoke gcc instead of generating abstract
+        // assembly
         String s = new CodeGenerator().generateCode(graphs);
         Files.writeString(output, s);
     }

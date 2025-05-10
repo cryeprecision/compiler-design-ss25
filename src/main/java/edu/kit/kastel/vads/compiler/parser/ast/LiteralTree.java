@@ -1,10 +1,7 @@
 package edu.kit.kastel.vads.compiler.parser.ast;
 
 import edu.kit.kastel.vads.compiler.Span;
-import edu.kit.kastel.vads.compiler.parser.ParseException;
 import edu.kit.kastel.vads.compiler.parser.visitor.Visitor;
-import edu.kit.kastel.vads.compiler.semantic.SemanticException;
-import java.util.Optional;
 import java.util.OptionalLong;
 
 public record LiteralTree(String value, int base, Span span) implements ExpressionTree {

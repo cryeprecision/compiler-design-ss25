@@ -40,24 +40,28 @@ public class Parser {
     }
 
     public ProgramTree parseProgram() {
+        // NOTE: This expects a single function as the whole program
         ProgramTree programTree = new ProgramTree(List.of(parseFunction()));
+
         if (this.tokenSource.hasMore()) {
             throw new ParseException("expected end of input but got " + this.tokenSource.peek());
         }
+
         return programTree;
     }
 
+    /// Parses a function declaration that is exactly `int identifier() { ... }`.
     private FunctionTree parseFunction() {
         Keyword returnType = this.tokenSource.expectKeyword(KeywordType.INT);
         Identifier identifier = this.tokenSource.expectIdentifier();
         this.tokenSource.expectSeparator(SeparatorType.PAREN_OPEN);
         this.tokenSource.expectSeparator(SeparatorType.PAREN_CLOSE);
         BlockTree body = parseBlock();
+
         return new FunctionTree(
-            new TypeTree(BasicType.INT, returnType.span()),
-            name(identifier),
-            body
-        );
+                new TypeTree(BasicType.INT, returnType.span()),
+                name(identifier),
+                body);
     }
 
     private BlockTree parseBlock() {
@@ -115,12 +119,14 @@ public class Parser {
     }
 
     private LValueTree parseLValue() {
+        // TODO: Does this allow `((a)) = 1`?
         if (this.tokenSource.peek().isSeparator(SeparatorType.PAREN_OPEN)) {
             this.tokenSource.expectSeparator(SeparatorType.PAREN_OPEN);
             LValueTree inner = parseLValue();
             this.tokenSource.expectSeparator(SeparatorType.PAREN_CLOSE);
             return inner;
         }
+
         Identifier identifier = this.tokenSource.expectIdentifier();
         return new LValueIdentTree(name(identifier));
     }
@@ -135,7 +141,7 @@ public class Parser {
         ExpressionTree lhs = parseTerm();
         while (true) {
             if (this.tokenSource.peek() instanceof Operator(var type, _)
-                && (type == OperatorType.PLUS || type == OperatorType.MINUS)) {
+                    && (type == OperatorType.PLUS || type == OperatorType.MINUS)) {
                 this.tokenSource.consume();
                 lhs = new BinaryOperationTree(lhs, parseTerm(), type);
             } else {
@@ -148,7 +154,7 @@ public class Parser {
         ExpressionTree lhs = parseFactor();
         while (true) {
             if (this.tokenSource.peek() instanceof Operator(var type, _)
-                && (type == OperatorType.MUL || type == OperatorType.DIV || type == OperatorType.MOD)) {
+                    && (type == OperatorType.MUL || type == OperatorType.DIV || type == OperatorType.MOD)) {
                 this.tokenSource.consume();
                 lhs = new BinaryOperationTree(lhs, parseFactor(), type);
             } else {

@@ -1,5 +1,8 @@
 package edu.kit.kastel.vads.compiler.lexer;
 
+import java.util.HashMap;
+import java.util.stream.Stream;
+
 public enum KeywordType {
   STRUCT("struct"),
   IF("if"),
@@ -26,6 +29,9 @@ public enum KeywordType {
 
   private final String keyword;
 
+  private final static HashMap<String, KeywordType> keywords = Stream.of(KeywordType.values())
+      .collect(HashMap::new, (map, kw) -> map.put(kw.keyword, kw), HashMap::putAll);
+
   KeywordType(String keyword) {
     this.keyword = keyword;
   }
@@ -37,5 +43,9 @@ public enum KeywordType {
   @Override
   public String toString() {
     return keyword();
+  }
+
+  public static HashMap<String, KeywordType> keywords() {
+    return keywords;
   }
 }

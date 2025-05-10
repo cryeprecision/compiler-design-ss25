@@ -18,11 +18,12 @@ public class TokenSource {
     private final List<Token> tokens;
     private int idx;
 
+    /// Tokenize the whole input string using the given lexer.
     public TokenSource(Lexer lexer) {
         this.tokens = Stream.generate(lexer::nextToken)
-            .takeWhile(Optional::isPresent)
-            .map(Optional::orElseThrow)
-            .toList();
+                .takeWhile(Optional::isPresent)
+                .map(Optional::orElseThrow)
+                .toList();
     }
 
     TokenSource(List<Token> tokens) {
@@ -60,6 +61,7 @@ public class TokenSource {
         this.idx++;
         return op;
     }
+
     public Identifier expectIdentifier() {
         Token token = peek();
         if (!(token instanceof Identifier ident)) {
