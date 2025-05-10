@@ -144,12 +144,15 @@ public class CodeGenerator {
                         .append(dest).append("\n");
             }
             case "idivl", "imodl" -> {
-                builder.repeat(INDENT, 1).append("xorl %edx, %edx").append("\n");
-
                 builder.repeat(INDENT, 1)
                         .append("movl").append(" ")
                         .append(left).append(", ")
                         .append("%eax").append("\n");
+
+                // Sign-extend EAX into EDX:EAX
+                // https://faydoc.tripod.com/cpu/cdq.htm
+                builder.repeat(INDENT, 1)
+                        .append("cdq").append("\n");
 
                 builder.repeat(INDENT, 1)
                         .append("idivl").append(" ")
