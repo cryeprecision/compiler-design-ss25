@@ -1,6 +1,6 @@
 package edu.kit.kastel.vads.compiler;
 
-import edu.kit.kastel.vads.compiler.backend.aasm.CodeGenerator;
+import edu.kit.kastel.vads.compiler.backend.x86_64.CodeGenerator;
 import edu.kit.kastel.vads.compiler.ir.IrGraph;
 import edu.kit.kastel.vads.compiler.ir.SsaTranslation;
 import edu.kit.kastel.vads.compiler.ir.optimize.LocalValueNumbering;
@@ -13,6 +13,7 @@ import edu.kit.kastel.vads.compiler.parser.ast.FunctionTree;
 import edu.kit.kastel.vads.compiler.parser.ast.ProgramTree;
 import edu.kit.kastel.vads.compiler.semantic.SemanticAnalysis;
 import edu.kit.kastel.vads.compiler.semantic.SemanticException;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,8 +40,8 @@ public class Main {
         }
 
         List<IrGraph> graphs = new ArrayList<>();
-        for (FunctionTree function : program.topLevelTrees()) {
-            SsaTranslation translation = new SsaTranslation(function, new LocalValueNumbering());
+        for (FunctionTree funcTree : program.topLevelTrees()) {
+            SsaTranslation translation = new SsaTranslation(funcTree, new LocalValueNumbering());
             graphs.add(translation.translate());
         }
 
@@ -55,7 +56,23 @@ public class Main {
         // TODO: generate assembly and invoke gcc instead of generating abstract
         // assembly
         String s = new CodeGenerator().generateCode(graphs);
-        Files.writeString(output, s);
+        Files.writeString(Path.of(output + ".s"), s);
+        invokeGcc(Path.of(output + ".s"), output);
+    }
+
+    private static void invokeGcc(Path assemblyFile, Path outputFile) {
+        try {
+            ProcessBuilder processBuilder = new ProcessBuilder(
+                    "gcc", assemblyFile.toString(), "-o", outputFile.toString());
+
+            Process process = processBuilder.start();
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                throw new RuntimeException("Error invoking GCC");
+            }
+        } catch (IOException | InterruptedException e) {
+            System.err.println("Error invoking GCC: " + e.getMessage());
+        }
     }
 
     private static ProgramTree lexAndParse(Path input) throws IOException {

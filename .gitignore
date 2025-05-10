@@ -1,3 +1,7 @@
 /build/
 /.idea/
 /.gradle/
+/.vscode/
+/test-gcc/
+/test-src/
+/test-src-out/

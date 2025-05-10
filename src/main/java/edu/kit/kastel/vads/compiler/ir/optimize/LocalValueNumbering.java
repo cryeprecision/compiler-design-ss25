@@ -13,6 +13,7 @@ import java.util.Map;
 public class LocalValueNumbering implements Optimizer {
     private final Map<Node, Node> knownNodes = new HashMap<>();
 
+    /// TODO: I don't understand this.
     @Override
     public Node transform(Node node) {
         return this.knownNodes.computeIfAbsent(node, n -> n);

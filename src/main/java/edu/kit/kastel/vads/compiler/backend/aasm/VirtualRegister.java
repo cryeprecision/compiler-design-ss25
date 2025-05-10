@@ -5,6 +5,6 @@ import edu.kit.kastel.vads.compiler.backend.regalloc.Register;
 public record VirtualRegister(int id) implements Register {
     @Override
     public String toString() {
-        return "%" + id();
+        return "%" + this.id();
     }
 }
