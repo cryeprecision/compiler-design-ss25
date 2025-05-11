@@ -29,6 +29,8 @@ public class Main {
 
         Path input = Path.of(args[0]);
         Path output = Path.of(args[1]);
+
+        String inputStr = Files.readString(input);
         ProgramTree program = lexAndParse(input);
 
         try {
@@ -53,7 +55,7 @@ public class Main {
             }
         }
 
-        String s = new CodeGenerator().generateCode(graphs);
+        String s = new CodeGenerator().generateCode(graphs, inputStr);
         Files.writeString(Path.of(output + ".s"), s);
         GccRunner.invoke(Path.of(output + ".s"), output);
     }

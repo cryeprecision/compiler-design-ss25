@@ -20,6 +20,7 @@ import edu.kit.kastel.vads.compiler.ir.node.ProjNode;
 import edu.kit.kastel.vads.compiler.ir.node.ReturnNode;
 import edu.kit.kastel.vads.compiler.ir.node.StartNode;
 import edu.kit.kastel.vads.compiler.ir.node.SubNode;
+import edu.kit.kastel.vads.compiler.ir.util.DebugInfo;
 import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
 
 public class CodeGenerator {
@@ -46,7 +47,7 @@ public class CodeGenerator {
                 ret
             """;
 
-    public String generateCode(List<IrGraph> program) {
+    public String generateCode(List<IrGraph> program, String source) {
         if (program.size() > 1) {
             throw new UnsupportedOperationException("multiple graphs not supported yet");
         }
@@ -57,24 +58,30 @@ public class CodeGenerator {
             GatRegisterAllocator allocator = new GatRegisterAllocator();
             Map<Node, Register> registers = allocator.allocateRegisters(graph);
 
-            generateForGraph(graph, builder, registers);
+            generateForGraph(graph, builder, registers, source);
             return TEMPLATE.replace(INDENT + "{{GENERATED_CODE}}", builder.toString());
         }
         return "";
     }
 
-    private void generateForGraph(IrGraph graph, StringBuilder builder, Map<Node, Register> registers) {
+    private void generateForGraph(IrGraph graph, StringBuilder builder, Map<Node, Register> registers, String source) {
         Set<Node> visited = new HashSet<>();
-        scan(graph.endBlock(), visited, builder, registers);
+        scan(graph.endBlock(), visited, builder, registers, source);
     }
 
-    private void scan(Node node, Set<Node> visited, StringBuilder builder, Map<Node, Register> registers) {
+    private void scan(Node node,
+            Set<Node> visited,
+            StringBuilder builder,
+            Map<Node, Register> registers,
+            String source) {
+
         for (Node predecessor : node.predecessors()) {
             if (visited.add(predecessor)) {
-                scan(predecessor, visited, builder, registers);
+                scan(predecessor, visited, builder, registers, source);
             }
         }
 
+        emitDebugInfo(builder, registers, node, source);
         switch (node) {
             case AddNode add -> emitBinaryOp(builder, registers, add, "addl");
             case SubNode sub -> emitBinaryOp(builder, registers, sub, "subl");
@@ -91,6 +98,39 @@ public class CodeGenerator {
         }
 
         builder.append('\n');
+    }
+
+    private static void emitDebugInfo(StringBuilder builder,
+            Map<Node, Register> registers,
+            Node node,
+            String source) {
+
+        // skip debug info for these nodes
+        switch (node) {
+            case Phi _,Block _,ProjNode _,StartNode _ -> {
+                return;
+            }
+            default -> {
+                // no-op
+            }
+        }
+
+        DebugInfo debugInfo = node.debugInfo();
+        if (!(debugInfo instanceof DebugInfo.SourceInfo)) {
+            builder.repeat(INDENT, 1)
+                    .append("# ").append("No source info 😢").append("\n");
+            return;
+        }
+
+        DebugInfo.SourceInfo sourceInfo = (DebugInfo.SourceInfo) debugInfo;
+        List<String> sourceLines = sourceInfo.span().fromSource(source).lines().toList();
+
+        builder.repeat(INDENT, 1)
+                .append("# ").append(sourceInfo.span()).append("\n");
+        for (String line : sourceLines) {
+            builder.repeat(INDENT, 1)
+                    .append("# ").append(line.trim()).append("\n");
+        }
     }
 
     private static void emitConstAssign(
