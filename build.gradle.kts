@@ -17,6 +17,7 @@ repositories {
 
 dependencies {
     implementation("org.jspecify:jspecify:1.0.0")
+    implementation("org.fusesource.jansi:jansi:2.4.2")
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
 }

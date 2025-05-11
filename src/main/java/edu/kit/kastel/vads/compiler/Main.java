@@ -53,26 +53,9 @@ public class Main {
             }
         }
 
-        // TODO: generate assembly and invoke gcc instead of generating abstract
-        // assembly
         String s = new CodeGenerator().generateCode(graphs);
         Files.writeString(Path.of(output + ".s"), s);
-        invokeGcc(Path.of(output + ".s"), output);
-    }
-
-    private static void invokeGcc(Path assemblyFile, Path outputFile) {
-        try {
-            ProcessBuilder processBuilder = new ProcessBuilder(
-                    "gcc", assemblyFile.toString(), "-o", outputFile.toString());
-
-            Process process = processBuilder.start();
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                throw new RuntimeException("Error invoking GCC");
-            }
-        } catch (IOException | InterruptedException e) {
-            System.err.println("Error invoking GCC: " + e.getMessage());
-        }
+        GccRunner.invoke(Path.of(output + ".s"), output);
     }
 
     private static ProgramTree lexAndParse(Path input) throws IOException {

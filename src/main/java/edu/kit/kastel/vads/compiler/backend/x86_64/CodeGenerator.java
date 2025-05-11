@@ -23,42 +23,44 @@ import edu.kit.kastel.vads.compiler.ir.node.SubNode;
 import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
 
 public class CodeGenerator {
-    private static String INDENT = "    ";
+    private static final String INDENT = "    ";
+    private static final String TEMPLATE = """
+            .global main
+            .global _main
+            .text
+
+            main:
+                # exit(_main())
+                call _main
+                movq %rax, %rdi
+                movq $0x3C, %rax
+                syscall
+
+            _main:
+                pushq %rbp
+                movq %rsp, %rbp
+
+                {{GENERATED_CODE}}
+
+                popq %rbp
+                ret
+            """;
 
     public String generateCode(List<IrGraph> program) {
+        if (program.size() > 1) {
+            throw new UnsupportedOperationException("multiple graphs not supported yet");
+        }
+
+        // FIXME: This assumes that the program consists of a single graph
         StringBuilder builder = new StringBuilder();
         for (IrGraph graph : program) {
             GatRegisterAllocator allocator = new GatRegisterAllocator();
             Map<Node, Register> registers = allocator.allocateRegisters(graph);
 
-            builder.append("""
-                    .global main
-                    .global _main
-                    .text
-
-                    main:
-                        call _main
-
-                        # move the return value into the first argument for the syscall
-                        movq %rax, %rdi
-                        # move the exit syscall number into rax
-                        movq $0x3C, %rax
-                        syscall
-
-                    _main:
-                        pushq %rbp
-                        movq %rsp, %rbp
-                    """)
-                    .append("\n");
-
             generateForGraph(graph, builder, registers);
-
-            builder.append("""
-                        popq %rbp
-                        ret
-                    """);
+            return TEMPLATE.replace(INDENT + "{{GENERATED_CODE}}", builder.toString());
         }
-        return builder.toString();
+        return "";
     }
 
     private void generateForGraph(IrGraph graph, StringBuilder builder, Map<Node, Register> registers) {
@@ -74,13 +76,13 @@ public class CodeGenerator {
         }
 
         switch (node) {
-            case AddNode add -> binary(builder, registers, add, "addl");
-            case SubNode sub -> binary(builder, registers, sub, "subl");
-            case MulNode mul -> binary(builder, registers, mul, "imull");
-            case DivNode div -> binary(builder, registers, div, "idivl");
-            case ModNode mod -> binary(builder, registers, mod, "imodl");
-            case ReturnNode r -> ret(builder, registers, r);
-            case ConstIntNode c -> cnst(builder, registers, c);
+            case AddNode add -> emitBinaryOp(builder, registers, add, "addl");
+            case SubNode sub -> emitBinaryOp(builder, registers, sub, "subl");
+            case MulNode mul -> emitBinaryOp(builder, registers, mul, "imull");
+            case DivNode div -> emitBinaryOp(builder, registers, div, "idivl");
+            case ModNode mod -> emitBinaryOp(builder, registers, mod, "imodl");
+            case ReturnNode r -> emitReturn(builder, registers, r);
+            case ConstIntNode c -> emitConstAssign(builder, registers, c);
             case Phi _ -> throw new UnsupportedOperationException("phi");
             case Block _,ProjNode _,StartNode _ -> {
                 // do nothing, skip line break
@@ -91,7 +93,7 @@ public class CodeGenerator {
         builder.append('\n');
     }
 
-    private static void cnst(
+    private static void emitConstAssign(
             StringBuilder builder,
             Map<Node, Register> registers,
             ConstIntNode node) {
@@ -104,20 +106,20 @@ public class CodeGenerator {
                 .append(dst).append("\n");
     }
 
-    private static void ret(
+    private static void emitReturn(
             StringBuilder builder,
             Map<Node, Register> registers,
             ReturnNode node) {
         var src = registers.get(NodeSupport.predecessorSkipProj(node, ReturnNode.RESULT));
 
-        builder.repeat(INDENT, 1).append("xor %rax, %rax").append("\n");
+        builder.repeat(INDENT, 1).append("xorq %rax, %rax").append("\n");
         builder.repeat(INDENT, 1)
                 .append("movl").append(" ")
                 .append(src).append(", ")
                 .append("%eax").append("\n");
     }
 
-    private static void binary(
+    private static void emitBinaryOp(
             StringBuilder builder,
             Map<Node, Register> registers,
             BinaryOperationNode node,

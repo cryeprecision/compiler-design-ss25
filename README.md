@@ -11,6 +11,13 @@ It contains:
 
 Furthermore, the starter code also provides working `build.sh` and `run.sh` files.
 
+## Useful Links
+
+- <https://docs.oracle.com/cd/E19253-01/817-5477/>
+- <https://yuriygeorgiev.com/2024/02/19/x86-64-cpu-architecture-the-stack/>
+- <http://infophysics.net/att0.pdf>
+- <https://wiki.osdev.org/CPU_Registers_x86>
+
 ## Code Overview
 
 The starter code is meant to spare you some initial work on things that are not covered
@@ -68,7 +75,7 @@ To figure out the cause, we provide utilities that ease debugging.
 - `edu.kit.kastel.vads.compiler.ir.util.GraphVizPrinter` can generate output in
   the DOT format. There are online tools (e.g.,
   <https://magjac.com/graphviz-visual-editor/>, which can display tooltips and
-  subgraphs, or https://www.yworks.com/yed-live/, which is relatively good at
+  subgraphs, or <https://www.yworks.com/yed-live/>, which is relatively good at
   neighbourhoods and larger layouts) that can visualize that output.
   It allows debugging anything related to the IR.
 - `edu.kit.kastel.vads.compiler.ir.util.YCompPrinter` can generate output for [yComp](https://pp.ipd.kit.edu/firm/yComp.html).
@@ -81,6 +88,7 @@ You can get rid of all that, but it can be helpful to track down where something
 
 To use yComp, you need to patch the provided start script to make it work with modern Java versions.
 You can copy-paste the following script:
+
 ```sh
 #!/bin/sh
 set -e
