@@ -8,9 +8,19 @@ public class MainFunctionExistsAnalysis implements NoOpVisitor<Namespace<Void>> 
 
     @Override
     public Unit visit(ProgramTree programTree, Namespace<Void> data) {
-        programTree.topLevelTrees().stream()
-                .filter(fnTree -> fnTree.name().name().asString() == "main")
-                .findAny().orElseThrow(() -> new SemanticException("missing main function"));
+        long mainFns = programTree.topLevelTrees().stream()
+                .filter(fnTree -> fnTree.name().name().asString().equals("main"))
+                .count();
+
+        if (mainFns < 1) {
+            throw new SemanticException("missing main function");
+        }
+        // TODO: This is currently never hit, because the parser panics when there are
+        // multiple top level definitions
+        if (mainFns > 1) {
+            throw new SemanticException("found multiple main functions");
+        }
+
         return NoOpVisitor.super.visit(programTree, data);
     }
 }
