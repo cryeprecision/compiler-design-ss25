@@ -47,6 +47,7 @@ class GraphConstructor {
     public Node newAdd(Node left, Node right) {
         return this.optimizer.transform(new AddNode(currentBlock(), left, right));
     }
+
     public Node newSub(Node left, Node right) {
         return this.optimizer.transform(new SubNode(currentBlock(), left, right));
     }
@@ -56,11 +57,13 @@ class GraphConstructor {
     }
 
     public Node newDiv(Node left, Node right) {
-        return this.optimizer.transform(new DivNode(currentBlock(), left, right, readCurrentSideEffect()));
+        return this.optimizer
+                .transform(new DivNode(currentBlock(), left, right, readCurrentSideEffect()));
     }
 
     public Node newMod(Node left, Node right) {
-        return this.optimizer.transform(new ModNode(currentBlock(), left, right, readCurrentSideEffect()));
+        return this.optimizer
+                .transform(new ModNode(currentBlock(), left, right, readCurrentSideEffect()));
     }
 
     public Node newReturn(Node result) {
@@ -94,36 +97,59 @@ class GraphConstructor {
         return this.graph;
     }
 
+    /// @see {@link edu.kit.kastel.vads.compiler.ir.GraphConstructor#readVariable}
     void writeVariable(Name variable, Block block, Node value) {
         this.currentDef.computeIfAbsent(variable, _ -> new HashMap<>()).put(block, value);
     }
 
+    /// Implements local value numbering (together with `writeVariable`).
+    ///
+    /// @see {@link edu.kit.kastel.vads.compiler.ir.GraphConstructor#writeVariable}
+    ///
+    /// ## Info
+    ///
+    /// - When the local value numbering for a block is finished, we call that block _filled_.
+    /// - Successors may only be added to _filled_ blocks.
     Node readVariable(Name variable, Block block) {
+        // Local value numbering
         Node node = this.currentDef.getOrDefault(variable, Map.of()).get(block);
         if (node != null) {
             return node;
         }
+
+        // Global value numbering
         return readVariableRecursive(variable, block);
     }
 
-
+    /// Implements global value numbering (together with `addPhiOperands`)
+    ///
+    /// @see {@link edu.kit.kastel.vads.compiler.ir.GraphConstructor#addPhiOperands}
     private Node readVariableRecursive(Name variable, Block block) {
         Node val;
         if (!this.sealedBlocks.contains(block)) {
+            // Handle incomplete CFG
+            // This block is not _sealed_ yet, so more predecessors might be added
             val = newPhi();
-            this.incompletePhis.computeIfAbsent(block, _ -> new HashMap<>()).put(variable, (Phi) val);
+            this.incompletePhis.computeIfAbsent(block, _ -> new HashMap<>()).put(variable,
+                    (Phi) val);
         } else if (block.predecessors().size() == 1) {
+            // There's only one predecessor
+            // => No Phi needed
             val = readVariable(variable, block.predecessors().getFirst().block());
         } else {
+            // Break potential cycles with operandless Phi
             val = newPhi();
             writeVariable(variable, block, val);
             val = addPhiOperands(variable, (Phi) val);
         }
+
         writeVariable(variable, block, val);
         return val;
     }
 
+    /// @see {@link edu.kit.kastel.vads.compiler.ir.GraphConstructor#readVariableRecursive}
     Node addPhiOperands(Name variable, Phi phi) {
+        // Determine operands from predecessors
         for (Node pred : phi.block().predecessors()) {
             phi.appendOperand(readVariable(variable, pred.block()));
         }
@@ -131,15 +157,21 @@ class GraphConstructor {
     }
 
     Node tryRemoveTrivialPhi(Phi phi) {
-        // TODO: the paper shows how to remove trivial phis.
-        // as this is not a problem in Lab 1 and it is just
-        // a simplification, we recommend to implement this
-        // part yourself.
+        // TODO: "Simple and Efficient SSA Construction" Algorithm 3
         return phi;
     }
 
+    /// A basic block is _sealed_, if no further predecessors will be added to it.
+    ///
+    /// Sealing a block is an explicit action during IR construction.
+    ///
+    /// - As only _filled_ blocks may have successors, _predecessors_ are always _filled_.
+    /// - A _sealed_ block is **not** necessarily _filled_.
+    /// - A _filled_ block can _provide_ variable definitions _for its successors_.
+    /// - A _sealed_ block may _look up_ variable definitions _in its predecessors_, as all predecessors are known.
     void sealBlock(Block block) {
-        for (Map.Entry<Name, Phi> entry : this.incompletePhis.getOrDefault(block, Map.of()).entrySet()) {
+        for (Map.Entry<Name, Phi> entry : this.incompletePhis.getOrDefault(block, Map.of())
+                .entrySet()) {
             addPhiOperands(entry.getKey(), entry.getValue());
         }
         this.sealedBlocks.add(block);
