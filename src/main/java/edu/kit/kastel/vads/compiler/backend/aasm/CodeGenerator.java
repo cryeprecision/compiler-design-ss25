@@ -25,26 +25,26 @@ import static edu.kit.kastel.vads.compiler.ir.util.NodeSupport.predecessorSkipPr
 
 public class CodeGenerator {
 
-    public String generateCode(List<IrGraph> program) {
+    public String generateCode(List<IrGraph> program, String source) {
         StringBuilder builder = new StringBuilder();
         for (IrGraph graph : program) {
             AasmRegisterAllocator allocator = new AasmRegisterAllocator();
-            Map<Node, Register> registers = allocator.allocateRegisters(graph);
-            builder.append("function ")
-                .append(graph.name())
-                .append(" {\n");
+            Map<Node, Register> registers = allocator.allocateRegisters(graph, source);
+            builder.append("function ").append(graph.name()).append(" {\n");
             generateForGraph(graph, builder, registers);
             builder.append("}");
         }
         return builder.toString();
     }
 
-    private void generateForGraph(IrGraph graph, StringBuilder builder, Map<Node, Register> registers) {
+    private void generateForGraph(IrGraph graph, StringBuilder builder,
+            Map<Node, Register> registers) {
         Set<Node> visited = new HashSet<>();
         scan(graph.endBlock(), visited, builder, registers);
     }
 
-    private void scan(Node node, Set<Node> visited, StringBuilder builder, Map<Node, Register> registers) {
+    private void scan(Node node, Set<Node> visited, StringBuilder builder,
+            Map<Node, Register> registers) {
         for (Node predecessor : node.predecessors()) {
             if (visited.add(predecessor)) {
                 scan(predecessor, visited, builder, registers);
@@ -58,13 +58,11 @@ public class CodeGenerator {
             case DivNode div -> binary(builder, registers, div, "div");
             case ModNode mod -> binary(builder, registers, mod, "mod");
             case ReturnNode r -> builder.repeat(" ", 2).append("ret ")
-                .append(registers.get(predecessorSkipProj(r, ReturnNode.RESULT)));
-            case ConstIntNode c -> builder.repeat(" ", 2)
-                .append(registers.get(c))
-                .append(" = const ")
-                .append(c.value());
+                    .append(registers.get(predecessorSkipProj(r, ReturnNode.RESULT)));
+            case ConstIntNode c -> builder.repeat(" ", 2).append(registers.get(c))
+                    .append(" = const ").append(c.value());
             case Phi _ -> throw new UnsupportedOperationException("phi");
-            case Block _, ProjNode _, StartNode _ -> {
+            case Block _,ProjNode _,StartNode _ -> {
                 // do nothing, skip line break
                 return;
             }
@@ -72,18 +70,11 @@ public class CodeGenerator {
         builder.append("\n");
     }
 
-    private static void binary(
-        StringBuilder builder,
-        Map<Node, Register> registers,
-        BinaryOperationNode node,
-        String opcode
-    ) {
-        builder.repeat(" ", 2).append(registers.get(node))
-            .append(" = ")
-            .append(opcode)
-            .append(" ")
-            .append(registers.get(predecessorSkipProj(node, BinaryOperationNode.LEFT)))
-            .append(" ")
-            .append(registers.get(predecessorSkipProj(node, BinaryOperationNode.RIGHT)));
+    private static void binary(StringBuilder builder, Map<Node, Register> registers,
+            BinaryOperationNode node, String opcode) {
+        builder.repeat(" ", 2).append(registers.get(node)).append(" = ").append(opcode).append(" ")
+                .append(registers.get(predecessorSkipProj(node, BinaryOperationNode.LEFT)))
+                .append(" ")
+                .append(registers.get(predecessorSkipProj(node, BinaryOperationNode.RIGHT)));
     }
 }

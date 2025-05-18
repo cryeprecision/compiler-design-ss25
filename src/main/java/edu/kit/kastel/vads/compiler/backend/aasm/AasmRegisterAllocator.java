@@ -19,7 +19,7 @@ public class AasmRegisterAllocator implements RegisterAllocator {
     private final Map<Node, Register> registers = new HashMap<>();
 
     @Override
-    public Map<Node, Register> allocateRegisters(IrGraph graph) {
+    public Map<Node, Register> allocateRegisters(IrGraph graph, String source) {
         Set<Node> visited = new HashSet<>();
         visited.add(graph.endBlock());
         scan(graph.endBlock(), visited);
@@ -38,9 +38,7 @@ public class AasmRegisterAllocator implements RegisterAllocator {
     }
 
     private static boolean needsRegister(Node node) {
-        return !(node instanceof ProjNode
-                || node instanceof StartNode
-                || node instanceof Block
+        return !(node instanceof ProjNode || node instanceof StartNode || node instanceof Block
                 || node instanceof ReturnNode);
     }
 }

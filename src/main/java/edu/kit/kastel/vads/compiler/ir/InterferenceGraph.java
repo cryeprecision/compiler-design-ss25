@@ -5,86 +5,88 @@ import edu.kit.kastel.vads.compiler.ir.node.ConstIntNode;
 import edu.kit.kastel.vads.compiler.ir.node.Node;
 import edu.kit.kastel.vads.compiler.ir.node.ReturnNode;
 import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Map.Entry;
 
 public class InterferenceGraph {
+  private final static boolean LOG_LIVE_IN_SETS = false;
+
   public static Map<Node, Set<Node>> buildInterferenceGraph(IrGraph graph) {
-    List<Node> basicNodeOrderRev =
-        BasicNodeOrder.buildBasicNodeOrder(graph).reversed();
 
-    Map<Node, Set<Node>> interferenceGraph = new HashMap<>();
-    Set<Node> liveNodes = new HashSet<>();
+    Map<Node, Set<Node>> liveIn = new HashMap<>();
+    Set<Node> liveInCurrent = new HashSet<>();
 
+    List<Node> basicNodeOrderRev = BasicNodeOrder.buildBasicNodeOrder(graph).reversed();
     for (Node node : basicNodeOrderRev) {
-      System.out.println("[InterferenceGraph] Visiting node: " + node + " " +
-                         node.hashCode());
-
       // Determine which other nodes are live at this node
       switch (node) {
         // return x
-      case ReturnNode retNode -> {
-        Node rValue =
-            NodeSupport.predecessorSkipProj(retNode, ReturnNode.RESULT);
+        case ReturnNode retNode -> {
+          Node rValue = NodeSupport.predecessorSkipProj(retNode, ReturnNode.RESULT);
 
-        // L3: The returned value is live at the return node
-        liveNodes.add(rValue);
-      }
+          // L3: The returned value is live at the return node
+          liveInCurrent.add(rValue);
+          liveIn.computeIfAbsent(retNode, (_) -> new HashSet<>()).addAll(liveInCurrent);
+        }
 
         // x <- constant
-      case ConstIntNode constIntNode -> {
-        // L4: Same as for L2, except we don't have operands
-        liveNodes.remove(constIntNode);
-      }
+        case ConstIntNode constIntNode -> {
+          // L4: Same as for L2, except we don't have operands
+          liveInCurrent.remove(constIntNode);
+          liveIn.computeIfAbsent(constIntNode, (_) -> new HashSet<>()).addAll(liveInCurrent);
+        }
 
         // x <- lhs [op] rhs
-      case BinaryOperationNode binaryOperationNode -> {
-        Node lhs = NodeSupport.predecessorSkipProj(binaryOperationNode,
-                                                   BinaryOperationNode.LEFT);
-        Node rhs = NodeSupport.predecessorSkipProj(binaryOperationNode,
-                                                   BinaryOperationNode.RIGHT);
+        case BinaryOperationNode binOpNode -> {
+          Node lhs = NodeSupport.predecessorSkipProj(binOpNode, BinaryOperationNode.LEFT);
+          Node rhs = NodeSupport.predecessorSkipProj(binOpNode, BinaryOperationNode.RIGHT);
 
-        // L1: The operands of the binary operation are live at the binary
-        // operation node
-        liveNodes.add(lhs);
-        liveNodes.add(rhs);
+          // L1: The operands of the binary operation are live at the binary operation node
+          liveInCurrent.add(lhs);
+          liveInCurrent.add(rhs);
+          // L2: If a value is live at the next line (previsouly processed) it is live at this line
+          // _unless_ it is assigned to
+          liveInCurrent.remove(binOpNode);
 
-        // L2: If a value is live at the next line (previsouly processed) it is
-        // live at this line _unless_ it is assigned to
-        liveNodes.remove(binaryOperationNode);
-      }
+          liveIn.computeIfAbsent(binOpNode, (_) -> new HashSet<>()).addAll(liveInCurrent);
+        }
 
         // No rules for other kinds of nodes
-      default -> {
-        /* no-op */
-      }
+        default -> {
+          /* no-op */
+        }
       } // switch (node)
-
-      // If a node v is live at a node u, then u and v interfere
-      // so we add edges (u, v) and (v, u)
-      List<Node> liveNodesList = new ArrayList<>(liveNodes);
-      for (int i = 0; i < liveNodesList.size(); i += 1) {
-        Node u = liveNodesList.get(i);
-        for (int j = 0; j < liveNodesList.size(); j += 1) {
-          Node v = liveNodesList.get(j);
-
-          if (u != v) {
-            Set<Node> uAdjacent =
-                interferenceGraph.computeIfAbsent(u, (_) -> new HashSet<>());
-            Set<Node> vAdjacent =
-                interferenceGraph.computeIfAbsent(v, (_) -> new HashSet<>());
-
-            uAdjacent.add(v);
-            vAdjacent.add(u);
-          }
-        } // for (j < i)
-      } // for (i < liveNodesList.size())
     } // for (node : basicNodeOrderRev)
 
+    if (LOG_LIVE_IN_SETS) {
+      System.out.println("[InterferenceGraph] Live-in sets:");
+      for (int i = 0; i < basicNodeOrderRev.size(); i += 1) {
+        Node node = basicNodeOrderRev.get(i);
+        Set<Node> liveAtNode = liveIn.get(node);
+        System.out.println(" - " + node + " [" + i + "]: " + liveAtNode);
+      }
+    }
+
+    // Compute the interference graph from the live-in information
+    Map<Node, Set<Node>> interferenceGraph = new HashMap<>();
+    for (Node node : basicNodeOrderRev) {
+      interferenceGraph.put(node, new HashSet<>());
+    }
+
+    for (Entry<Node, Set<Node>> entry : liveIn.entrySet()) {
+      Node u = entry.getKey();
+      Set<Node> liveAtU = entry.getValue();
+
+      for (Node v : liveAtU) {
+        assert !u.equals(v) : "Node " + u + " cannot interfere with itself";
+        interferenceGraph.get(u).add(v);
+        interferenceGraph.get(v).add(u);
+      }
+    }
     return interferenceGraph;
   }
 }

@@ -24,16 +24,11 @@ public sealed interface Span {
 
         @Override
         public String fromSource(String source) {
-            // FIXME: Very bad, allocates many objects
-            List<String> lines = source.lines().toList();
-            StringBuilder builder = new StringBuilder();
-
-            for (int i = start().line(); i <= end().line(); i++) {
-                String line = lines.get(i);
-                builder.append(line).append("\n");
+            if (start.line() != end.line()) {
+                return toString();
             }
-
-            return builder.toString();
+            List<String> lines = source.lines().toList();
+            return lines.get(start.line()).substring(start.column(), end.column()).trim();
         }
     }
 }
