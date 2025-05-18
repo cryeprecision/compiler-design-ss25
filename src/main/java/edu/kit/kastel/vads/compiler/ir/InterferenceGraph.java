@@ -1,19 +1,21 @@
 package edu.kit.kastel.vads.compiler.ir;
 
-import edu.kit.kastel.vads.compiler.ir.node.BinaryOperationNode;
-import edu.kit.kastel.vads.compiler.ir.node.ConstIntNode;
-import edu.kit.kastel.vads.compiler.ir.node.Node;
-import edu.kit.kastel.vads.compiler.ir.node.ReturnNode;
-import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.stream.Collectors;
+import edu.kit.kastel.vads.compiler.ir.node.BinaryOperationNode;
+import edu.kit.kastel.vads.compiler.ir.node.Block;
+import edu.kit.kastel.vads.compiler.ir.node.ConstIntNode;
+import edu.kit.kastel.vads.compiler.ir.node.Node;
+import edu.kit.kastel.vads.compiler.ir.node.ReturnNode;
+import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
 
 public class InterferenceGraph {
-  private final static boolean LOG_LIVE_IN_SETS = false;
+  private final static boolean LOG_LIVE_IN_SETS = true;
 
   public static Map<Node, Set<Node>> buildInterferenceGraph(IrGraph graph) {
 
@@ -55,6 +57,11 @@ public class InterferenceGraph {
           liveIn.computeIfAbsent(binOpNode, (_) -> new HashSet<>()).addAll(liveInCurrent);
         }
 
+        // Return register is live after the last instruction
+        case Block _ -> {
+          // TODO: Return register is live after the last instruction
+        }
+
         // No rules for other kinds of nodes
         default -> {
           /* no-op */
@@ -79,12 +86,20 @@ public class InterferenceGraph {
 
     for (Entry<Node, Set<Node>> entry : liveIn.entrySet()) {
       Node u = entry.getKey();
-      Set<Node> liveAtU = entry.getValue();
 
-      for (Node v : liveAtU) {
-        assert !u.equals(v) : "Node " + u + " cannot interfere with itself";
-        interferenceGraph.get(u).add(v);
-        interferenceGraph.get(v).add(u);
+      switch (u) {
+        case BinaryOperationNode _,ConstIntNode _ -> {
+          Set<Node> liveInAtSuccessors =
+              graph.successors(u).stream().flatMap((v) -> liveIn.get(v).stream())
+                  .filter((v) -> !v.equals(u)).collect(Collectors.toSet());
+          for (Node v : liveInAtSuccessors) {
+            interferenceGraph.get(u).add(v);
+            interferenceGraph.get(v).add(u);
+          }
+        }
+        default -> {
+          /* no-op */
+        }
       }
     }
     return interferenceGraph;
