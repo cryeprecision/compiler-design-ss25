@@ -7,4 +7,9 @@ public record VirtualRegister(int id) implements Register {
     public String toString() {
         return "%" + this.id();
     }
+
+    @Override
+    public boolean isSpillRegister() {
+        return false;
+    }
 }

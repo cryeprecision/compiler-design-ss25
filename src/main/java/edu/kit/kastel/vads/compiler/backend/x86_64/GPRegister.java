@@ -1,47 +1,34 @@
 package edu.kit.kastel.vads.compiler.backend.x86_64;
 
-import java.util.Set;
+import java.util.List;
 
 import edu.kit.kastel.vads.compiler.backend.regalloc.Register;
-import edu.kit.kastel.vads.compiler.ir.node.DivNode;
-import edu.kit.kastel.vads.compiler.ir.node.ModNode;
-import edu.kit.kastel.vads.compiler.ir.node.Node;
-import edu.kit.kastel.vads.compiler.ir.node.StartNode;
 
 /// General Purpose Register
 public class GPRegister {
-    public record Temporary(int id) implements Register {
-        @Override
-        public String toString() {
-            return String.format("t%d", this.id());
+    static public Register forColor(int color) {
+        List<x86Register> registers = List.of(x86Register.values());
+        if (color < registers.size()) {
+            return registers.get(color);
         }
-
-        public boolean equals(Object obj) {
-            if (obj instanceof Temporary other) {
-                return this.id() == other.id();
-            }
-            return false;
-        }
+        return new SpillRegister(color - registers.size());
     }
 
     public enum x86Register implements Register {
-        RSP("RSP"),
-        RBP("RBP"),
-        EAX("EAX"),
-        EBX("EBX"),
-        ECX("ECX"),
-        EDX("EDX"),
-        ESI("ESI"),
-        EDI("EDI"),
-        R8D("R8D"),
-        R9D("R9D"),
-        R10D("R10D"),
-        R11D("R11D"),
-        R12D("R12D"),
-        R13D("R13D"),
-        R14D("R14D"),
-        R15D("R15D"),
-        ;
+        // EAX("eax"), // Reserved for idiv instruction
+        EBX("ebx"),
+        ECX("ecx"),
+        // EDX("edx"), // Reserved for idiv instruction
+        ESI("esi"),
+        EDI("edi"),
+        R8D("r8d"),
+        R9D("r9d"),
+        R10D("r10d"),
+        // R11D("r11d"), // Reserved for handling spilled registers
+        R12D("r12d"),
+        R13D("r13d"),
+        R14D("r14d"),
+        R15D("r15d");
 
         private final String name;
 
@@ -53,22 +40,26 @@ public class GPRegister {
             return name;
         }
 
-        public static Set<Register> sideEffectRegs(Node node) {
-            switch (node) {
-                case DivNode _ -> {
-                    return Set.of(x86Register.EDX);
-                }
-                case ModNode _ -> {
-                    return Set.of(x86Register.EDX);
-                }
-                case StartNode _ -> {
-                    // TODO: ???
-                    return Set.of(x86Register.RSP, x86Register.RBP);
-                }
-                default -> {
-                    return Set.of();
-                }
-            }
+        @Override
+        public String toString() {
+            return "%%%s".formatted(this.name);
+        }
+
+        @Override
+        public boolean isSpillRegister() {
+            return false;
+        }
+    }
+
+    public record SpillRegister(int offset) implements Register {
+        @Override
+        public boolean isSpillRegister() {
+            return true;
+        }
+
+        @Override
+        public final String toString() {
+            return "-%d(%%rbp)".formatted((this.offset + 1) * 4);
         }
     }
 }

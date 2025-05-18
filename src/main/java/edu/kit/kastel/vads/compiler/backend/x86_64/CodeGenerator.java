@@ -25,6 +25,8 @@ import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
 
 public class CodeGenerator {
     private static final String INDENT = "    ";
+    private static final String SPILL_REG = "%r11d";
+
     private static final String TEMPLATE = """
             .global main
             .global _main
@@ -63,14 +65,15 @@ public class CodeGenerator {
         return TEMPLATE.replace(INDENT + "{{GENERATED_CODE}}", builder.toString());
     }
 
-    private void generateForGraph(IrGraph graph, StringBuilder builder,
-            Map<Node, Register> registers, String source) {
+    // TODO: Implement graph tiling and proper interference so we don't have to
+    // exclude registers from being used for useful thingies.
+    private void generateForGraph(IrGraph graph, StringBuilder builder, Map<Node, Register> registers, String source) {
         Set<Node> visited = new HashSet<>();
         scan(graph.endBlock(), visited, builder, registers, source);
     }
 
-    private void scan(Node node, Set<Node> visited, StringBuilder builder,
-            Map<Node, Register> registers, String source) {
+    private void scan(Node node, Set<Node> visited, StringBuilder builder, Map<Node, Register> registers,
+            String source) {
 
         for (Node predecessor : node.predecessors()) {
             if (visited.add(predecessor)) {
@@ -97,91 +100,65 @@ public class CodeGenerator {
         builder.append('\n');
     }
 
-    private static void emitDebugInfo(StringBuilder builder, Map<Node, Register> registers,
-            Node node, String source) {
+    private static void emitDebugInfo(StringBuilder builder, Map<Node, Register> registers, Node node, String source) {
 
         // skip debug info for these nodes
-        switch (node) {
-            case Phi _,Block _,ProjNode _,StartNode _ -> {
-                return;
-            }
-            default -> {
-                // no-op
-            }
-        }
-
-        DebugInfo debugInfo = node.debugInfo();
-        if (!(debugInfo instanceof DebugInfo.SourceInfo)) {
-            builder.repeat(INDENT, 1).append("# ").append("No source info 😢").append("\n");
+        if (node instanceof Phi || node instanceof Block || node instanceof ProjNode || node instanceof StartNode) {
             return;
         }
 
-        DebugInfo.SourceInfo sourceInfo = (DebugInfo.SourceInfo) debugInfo;
-        List<String> sourceLines = sourceInfo.span().fromSource(source).lines().toList();
-
-        builder.repeat(INDENT, 1).append("# ").append(sourceInfo.span()).append("\n");
-        for (String line : sourceLines) {
-            builder.repeat(INDENT, 1).append("# ").append(line.trim()).append("\n");
+        if (!(node.debugInfo() instanceof DebugInfo.SourceInfo sourceInfo)) {
+            builder.repeat(INDENT, 1).append("# No source info 😢\n");
+            return;
         }
+
+        builder.repeat(INDENT, 1).append("# %s\n".formatted(sourceInfo.span()));
+        sourceInfo.span().fromSource(source).lines().map(String::trim)
+                .forEach(line -> builder.repeat(INDENT, 1).append("# %s\n".formatted(line)));
     }
 
-    private static void emitConstAssign(StringBuilder builder, Map<Node, Register> registers,
-            ConstIntNode node) {
-        var dst = registers.get(node);
+    private static void emitConstAssign(StringBuilder builder, Map<Node, Register> registers, ConstIntNode node) {
         var value = node.value();
+        var dst = registers.get(node);
 
-        builder.repeat(INDENT, 1).append("movl").append(" ").append("$").append(value).append(", ")
-                .append(dst).append("\n");
+        builder.repeat(INDENT, 1).append("movl $%d, %s\n".formatted(value, dst));
     }
 
-    private static void emitReturn(StringBuilder builder, Map<Node, Register> registers,
-            ReturnNode node) {
+    private static void emitReturn(StringBuilder builder, Map<Node, Register> registers, ReturnNode node) {
         var src = registers.get(NodeSupport.predecessorSkipProj(node, ReturnNode.RESULT));
 
-        builder.repeat(INDENT, 1).append("xorq %rax, %rax").append("\n");
-        builder.repeat(INDENT, 1).append("movl").append(" ").append(src).append(", ").append("%eax")
-                .append("\n");
+        builder.repeat(INDENT, 1).append("movl %s, %s\n".formatted(src, "%eax"));
     }
 
-    private static void emitBinaryOp(StringBuilder builder, Map<Node, Register> registers,
-            BinaryOperationNode node, String opcode) {
+    private static void emitBinaryOp(StringBuilder builder, Map<Node, Register> registers, BinaryOperationNode node,
+            String opcode) {
+
+        var lhs = registers.get(NodeSupport.predecessorSkipProj(node, BinaryOperationNode.LEFT));
+        var rhs = registers.get(NodeSupport.predecessorSkipProj(node, BinaryOperationNode.RIGHT));
         var dest = registers.get(node);
-        var left = registers.get(NodeSupport.predecessorSkipProj(node, BinaryOperationNode.LEFT));
-        var right = registers.get(NodeSupport.predecessorSkipProj(node, BinaryOperationNode.RIGHT));
 
         switch (opcode) {
             case "addl", "subl", "imull" -> {
-                builder.repeat(INDENT, 1).append("movl").append(" ").append(left).append(", ")
-                        .append("%eax").append("\n");
-
-                builder.repeat(INDENT, 1).append(opcode).append(" ").append(right).append(", ")
-                        .append("%eax").append("\n");
-
-                builder.repeat(INDENT, 1).append("movl").append(" ").append("%eax").append(", ")
-                        .append(dest).append("\n");
+                // TODO: I'm not happy with this, but at least it works
+                // Either I'm doing something wrong during register allocation
+                // or I just have to implement the special case `t1 <- t1 [op] t2`
+                // where I don't need the extra register.
+                //
+                // But then this should be solved when I come around to implement tree tiling
+                // from the Modern Compiler Implementation book.
+                builder.repeat(INDENT, 1).append("movl %s, %s\n".formatted(lhs, SPILL_REG));
+                builder.repeat(INDENT, 1).append("%s %s, %s\n".formatted(opcode, rhs, SPILL_REG));
+                builder.repeat(INDENT, 1).append("movl %s, %s\n".formatted(SPILL_REG, dest));
             }
             case "idivl", "imodl" -> {
-                builder.repeat(INDENT, 1).append("movl").append(" ").append(left).append(", ")
-                        .append("%eax").append("\n");
-
                 // Sign-extend EAX into EDX:EAX
                 // https://faydoc.tripod.com/cpu/cdq.htm
-                builder.repeat(INDENT, 1).append("cdq").append("\n");
-
-                builder.repeat(INDENT, 1).append("idivl").append(" ").append(right).append("\n");
-
-                switch (opcode) {
-                    case "idivl" -> {
-                        builder.repeat(INDENT, 1).append("movl").append(" ").append("%eax")
-                                .append(", ").append(dest).append("\n");
-                    }
-                    case "imodl" -> {
-                        builder.repeat(INDENT, 1).append("movl").append(" ").append("%edx")
-                                .append(", ").append(dest).append("\n");
-                    }
-                }
+                String resultReg = opcode == "idivl" ? "%eax" : "%edx";
+                builder.repeat(INDENT, 1).append("movl %s, %s\n".formatted(lhs, "%eax"));
+                builder.repeat(INDENT, 1).append("cdq\n");
+                builder.repeat(INDENT, 1).append("idivl %s\n".formatted(rhs));
+                builder.repeat(INDENT, 1).append("movl %s, %s\n".formatted(resultReg, dest));
             }
         }
-
     }
 }

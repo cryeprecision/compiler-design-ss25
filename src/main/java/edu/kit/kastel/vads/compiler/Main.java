@@ -59,7 +59,7 @@ public class Main {
 
         String s = new CodeGenerator().generateCode(graphs, inputStr);
         Files.writeString(Path.of(output + ".s"), s);
-        // GccRunner.invoke(Path.of(output + ".s"), output);
+        GccRunner.invoke(Path.of(output + ".s"), output);
     }
 
     private static ProgramTree lexAndParse(Path input) throws IOException {

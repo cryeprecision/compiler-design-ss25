@@ -11,7 +11,9 @@ import edu.kit.kastel.vads.compiler.ir.node.BinaryOperationNode;
 import edu.kit.kastel.vads.compiler.ir.node.Block;
 import edu.kit.kastel.vads.compiler.ir.node.ConstIntNode;
 import edu.kit.kastel.vads.compiler.ir.node.Node;
+import edu.kit.kastel.vads.compiler.ir.node.ProjNode;
 import edu.kit.kastel.vads.compiler.ir.node.ReturnNode;
+import edu.kit.kastel.vads.compiler.ir.node.StartNode;
 import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
 
 public class InterferenceGraph {
@@ -47,11 +49,12 @@ public class InterferenceGraph {
           Node lhs = NodeSupport.predecessorSkipProj(binOpNode, BinaryOperationNode.LEFT);
           Node rhs = NodeSupport.predecessorSkipProj(binOpNode, BinaryOperationNode.RIGHT);
 
-          // L1: The operands of the binary operation are live at the binary operation node
+          // L1: The operands of the binary operation are live at the binary operation
+          // node
           liveInCurrent.add(lhs);
           liveInCurrent.add(rhs);
-          // L2: If a value is live at the next line (previsouly processed) it is live at this line
-          // _unless_ it is assigned to
+          // L2: If a value is live at the next line (previsouly processed) it is live at
+          // this line _unless_ it is assigned to
           liveInCurrent.remove(binOpNode);
 
           liveIn.computeIfAbsent(binOpNode, (_) -> new HashSet<>()).addAll(liveInCurrent);
@@ -89,9 +92,12 @@ public class InterferenceGraph {
 
       switch (u) {
         case BinaryOperationNode _,ConstIntNode _ -> {
-          Set<Node> liveInAtSuccessors =
-              graph.successors(u).stream().flatMap((v) -> liveIn.get(v).stream())
-                  .filter((v) -> !v.equals(u)).collect(Collectors.toSet());
+          Set<Node> liveInAtSuccessors = graph
+              .successors(u).stream()
+              .filter(v -> !(v instanceof ProjNode || v instanceof StartNode))
+              .flatMap((v) -> liveIn.get(v).stream())
+              .filter((v) -> !v.equals(u)).collect(Collectors.toSet());
+
           for (Node v : liveInAtSuccessors) {
             interferenceGraph.get(u).add(v);
             interferenceGraph.get(v).add(u);
