@@ -54,14 +54,13 @@ public class CodeGenerator {
 
         // FIXME: This assumes that the program consists of a single graph
         StringBuilder builder = new StringBuilder();
-        for (IrGraph graph : program) {
-            GatRegisterAllocator allocator = new GatRegisterAllocator();
-            Map<Node, Register> registers = allocator.allocateRegisters(graph);
+        IrGraph graph = program.get(0);
 
-            generateForGraph(graph, builder, registers, source);
-            return TEMPLATE.replace(INDENT + "{{GENERATED_CODE}}", builder.toString());
-        }
-        return "";
+        GatRegisterAllocator allocator = new GatRegisterAllocator();
+        Map<Node, Register> registers = allocator.allocateRegisters(graph);
+
+        generateForGraph(graph, builder, registers, source);
+        return TEMPLATE.replace(INDENT + "{{GENERATED_CODE}}", builder.toString());
     }
 
     private void generateForGraph(IrGraph graph, StringBuilder builder, Map<Node, Register> registers, String source) {

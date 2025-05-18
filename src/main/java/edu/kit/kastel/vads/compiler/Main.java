@@ -49,7 +49,9 @@ public class Main {
 
         if ("vcg".equals(System.getenv("DUMP_GRAPHS")) || "vcg".equals(System.getProperty("dumpGraphs"))) {
             Path tmp = output.toAbsolutePath().resolveSibling("graphs");
-            Files.createDirectory(tmp);
+            if (!Files.exists(tmp)) {
+                Files.createDirectory(tmp);
+            }
             for (IrGraph graph : graphs) {
                 dumpGraph(graph, tmp, "before-codegen");
             }
@@ -57,7 +59,7 @@ public class Main {
 
         String s = new CodeGenerator().generateCode(graphs, inputStr);
         Files.writeString(Path.of(output + ".s"), s);
-        GccRunner.invoke(Path.of(output + ".s"), output);
+        // GccRunner.invoke(Path.of(output + ".s"), output);
     }
 
     private static ProgramTree lexAndParse(Path input) throws IOException {

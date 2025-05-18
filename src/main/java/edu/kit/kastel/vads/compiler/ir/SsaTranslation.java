@@ -221,6 +221,7 @@ public class SsaTranslation {
             if (!(divMod instanceof DivNode || divMod instanceof ModNode)) {
                 return divMod;
             }
+            // Keep the side-effect chain alive or something?
             Node projSideEffect = data.constructor.newSideEffectProj(divMod);
             data.constructor.writeCurrentSideEffect(projSideEffect);
             return data.constructor.newResultProj(divMod);
