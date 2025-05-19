@@ -36,9 +36,10 @@ public class GccRunner {
 
     public static void invoke(Path assemblyFile, Path outputFile) {
         try {
-            ProcessBuilder processBuilder = new ProcessBuilder("gcc",
-                    assemblyFile.toString(),
-                    "-o", outputFile.toString());
+            ProcessBuilder processBuilder = new ProcessBuilder(
+                    "gcc", "-g",
+                    "-o", outputFile.toString(),
+                    assemblyFile.toString());
 
             Process process = processBuilder.start();
             int exitCode = process.waitFor();

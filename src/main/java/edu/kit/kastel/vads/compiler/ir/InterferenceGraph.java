@@ -91,8 +91,8 @@ public class InterferenceGraph {
 
       switch (u) {
         case BinaryOperationNode _,ConstIntNode _ -> {
-          Set<Node> liveInAtSuccessors = NodeSupport.successorsSkipProj(graph, u)
-              .stream()
+          Set<Node> liveInAtSuccessors = NodeSupport
+              .successorsSkipProj(graph, u).stream()
               .flatMap((v) -> liveIn.getOrDefault(v, Set.of()).stream())
               .filter((v) -> !v.equals(u))
               .collect(Collectors.toSet());
