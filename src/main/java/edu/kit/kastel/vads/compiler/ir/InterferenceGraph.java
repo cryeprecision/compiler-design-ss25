@@ -95,7 +95,7 @@ public class InterferenceGraph {
         case BinaryOperationNode _,ConstIntNode _ -> {
           Set<Node> liveInAtSuccessors = graph
               .successors(u).stream()
-              .map(v -> (v instanceof ProjNode proj) && proj.projectionInfo() == SimpleProjectionInfo.RESULT
+              .map(v -> (v instanceof ProjNode _)
                   ? graph.successors(v).stream().findFirst().orElse(null)
                   : v)
               .filter(v -> v != null)
