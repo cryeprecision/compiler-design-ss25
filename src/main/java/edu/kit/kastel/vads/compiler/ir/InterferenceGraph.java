@@ -12,8 +12,6 @@ import edu.kit.kastel.vads.compiler.ir.node.BinaryOperationNode;
 import edu.kit.kastel.vads.compiler.ir.node.Block;
 import edu.kit.kastel.vads.compiler.ir.node.ConstIntNode;
 import edu.kit.kastel.vads.compiler.ir.node.Node;
-import edu.kit.kastel.vads.compiler.ir.node.ProjNode;
-import edu.kit.kastel.vads.compiler.ir.node.ProjNode.SimpleProjectionInfo;
 import edu.kit.kastel.vads.compiler.ir.node.ReturnNode;
 import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
 
@@ -93,14 +91,11 @@ public class InterferenceGraph {
 
       switch (u) {
         case BinaryOperationNode _,ConstIntNode _ -> {
-          Set<Node> liveInAtSuccessors = graph
-              .successors(u).stream()
-              .map(v -> (v instanceof ProjNode _)
-                  ? graph.successors(v).stream().findFirst().orElse(null)
-                  : v)
-              .filter(v -> v != null)
+          Set<Node> liveInAtSuccessors = NodeSupport.successorsSkipProj(graph, u)
+              .stream()
               .flatMap((v) -> liveIn.getOrDefault(v, Set.of()).stream())
-              .filter((v) -> !v.equals(u)).collect(Collectors.toSet());
+              .filter((v) -> !v.equals(u))
+              .collect(Collectors.toSet());
 
           for (Node v : liveInAtSuccessors) {
             interferenceGraph.get(u).add(v);
