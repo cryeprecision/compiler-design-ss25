@@ -7,13 +7,14 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Collectors;
+
 import edu.kit.kastel.vads.compiler.ir.node.BinaryOperationNode;
 import edu.kit.kastel.vads.compiler.ir.node.Block;
 import edu.kit.kastel.vads.compiler.ir.node.ConstIntNode;
 import edu.kit.kastel.vads.compiler.ir.node.Node;
 import edu.kit.kastel.vads.compiler.ir.node.ProjNode;
+import edu.kit.kastel.vads.compiler.ir.node.ProjNode.SimpleProjectionInfo;
 import edu.kit.kastel.vads.compiler.ir.node.ReturnNode;
-import edu.kit.kastel.vads.compiler.ir.node.StartNode;
 import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
 
 public class InterferenceGraph {
@@ -94,8 +95,10 @@ public class InterferenceGraph {
         case BinaryOperationNode _,ConstIntNode _ -> {
           Set<Node> liveInAtSuccessors = graph
               .successors(u).stream()
-              .filter(v -> !(v instanceof ProjNode || v instanceof StartNode))
-              .flatMap((v) -> liveIn.get(v).stream())
+              .map(v -> (v instanceof ProjNode proj) && proj.projectionInfo() == SimpleProjectionInfo.RESULT
+                  ? graph.successors(v).stream().findFirst().orElseThrow()
+                  : v)
+              .flatMap((v) -> liveIn.getOrDefault(v, Set.of()).stream())
               .filter((v) -> !v.equals(u)).collect(Collectors.toSet());
 
           for (Node v : liveInAtSuccessors) {
