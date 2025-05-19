@@ -96,8 +96,9 @@ public class InterferenceGraph {
           Set<Node> liveInAtSuccessors = graph
               .successors(u).stream()
               .map(v -> (v instanceof ProjNode proj) && proj.projectionInfo() == SimpleProjectionInfo.RESULT
-                  ? graph.successors(v).stream().findFirst().orElseThrow()
+                  ? graph.successors(v).stream().findFirst().orElse(null)
                   : v)
+              .filter(v -> v != null)
               .flatMap((v) -> liveIn.getOrDefault(v, Set.of()).stream())
               .filter((v) -> !v.equals(u)).collect(Collectors.toSet());
 
