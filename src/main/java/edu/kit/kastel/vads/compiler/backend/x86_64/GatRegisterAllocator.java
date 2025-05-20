@@ -19,6 +19,8 @@ import edu.kit.kastel.vads.compiler.ir.node.ReturnNode;
 import edu.kit.kastel.vads.compiler.ir.node.StartNode;
 
 public class GatRegisterAllocator implements RegisterAllocator {
+  public static boolean LOG_BASIC_NODE_ORDER = false;
+
   @Override
   public Map<Node, Register> allocateRegisters(IrGraph graph, String source) {
     List<Node> basicOrder = BasicNodeOrder
@@ -31,23 +33,25 @@ public class GatRegisterAllocator implements RegisterAllocator {
         .buildGreedyColoring(interferenceGraph, simplicalEliminationOrder);
     Map<Node, Register> registerAllocation = allocateRegistersInner(interferenceGraphColoring);
 
-    // Log everything for debugging
-    System.out.println("[GatRegisterAllocator] Basic node order:");
-    for (int i = basicOrder.size() - 1; i >= 0; i -= 1) {
-      Node node = basicOrder.get(i);
+    if (LOG_BASIC_NODE_ORDER) {
+      // Log everything for debugging
+      System.out.println("[GatRegisterAllocator] Basic node order:");
+      for (int i = basicOrder.size() - 1; i >= 0; i -= 1) {
+        Node node = basicOrder.get(i);
 
-      int reversedIndex = basicOrder.size() - i - 1;
-      Set<Node> interferenceSet = interferenceGraph.get(node) == null
-          ? Set.of()
-          : interferenceGraph.get(node);
+        int reversedIndex = basicOrder.size() - i - 1;
+        Set<Node> interferenceSet = interferenceGraph.get(node) == null
+            ? Set.of()
+            : interferenceGraph.get(node);
 
-      System.out.println(" - %20s [idx: %2d, col: %2d, reg: %s]: %20s '%s'".formatted(
-          node,
-          reversedIndex,
-          interferenceGraphColoring.get(node),
-          registerAllocation.get(node),
-          interferenceSet,
-          node.sourceSpan(source)));
+        System.out.println(" - %20s [idx: %2d, col: %2d, reg: %s]: %20s '%s'".formatted(
+            node,
+            reversedIndex,
+            interferenceGraphColoring.get(node),
+            registerAllocation.get(node),
+            interferenceSet,
+            node.sourceSpan(source)));
+      }
     }
 
     return registerAllocation;

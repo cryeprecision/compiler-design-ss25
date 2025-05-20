@@ -16,7 +16,7 @@ import edu.kit.kastel.vads.compiler.ir.node.ReturnNode;
 import edu.kit.kastel.vads.compiler.ir.util.NodeSupport;
 
 public class InterferenceGraph {
-  private final static boolean LOG_LIVE_IN_SETS = true;
+  private final static boolean LOG_LIVE_IN_SETS = false;
 
   public static Map<Node, Set<Node>> buildInterferenceGraph(IrGraph graph) {
 
